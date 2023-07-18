@@ -1,0 +1,3 @@
+Average hsv: [120.74,211.76,26.37]
+Standard deviation: [4.88,47.11,10.45]
+HSV interval for 90% of masked points: [113-129, 134-255, 9-44]
