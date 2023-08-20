@@ -6,8 +6,37 @@ import cv2
 import numpy as np
 import statistics
 
+class BoundingBox:
+    def __init__(self) -> None:
+        self.x_min = 0
+        self.x_max = 0
+        self.y_min = 0
+        self.y_max = 0
+    def __init__(self, x_min, x_max, y_min, y_max):
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = y_min
+        self.y_max = y_max
+
+class Cone:
+    def __init__(self, img, x_min, x_max, y_min, y_max) -> None:
+        # Pointer to image containing the cone
+        img = img
+
+        # 2d Points
+        self.triangle_top        = []
+        self.triangle_left       = []
+        self.triangle_right      = []
+        self.trapeze_bot_left    = []
+        self.trapeze_bot_right   = []
+        self.trapeze_top_left    = []
+        self.trapeze_top_right   = []
+
+        # Coordinates of the bounding box
+        self.bounding_box        = BoundingBox(x_min, x_max, y_min, y_max)
+
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument("--image", default='media/test.png', help="image for prediction")
+parser.add_argument("--image", default='media/test2.png', help="image for prediction")
 parser.add_argument("--video", default='media/nude_cones_hot_videos/Webcam/3m_static.webm', help="class names path")
 parser.add_argument("--config", default='cfg/yolov3-tiny-UPMR.cfg', help="YOLO config path")
 parser.add_argument("--weights", default='weights/yolov3-tiny-UPMR.weights', help="YOLO weights path")
@@ -85,13 +114,13 @@ for index in indices:
 
 # Margin for each bounding box
 margin = 0.2
-triangle_top_points = []
-trapeze_bot_left_points = []
-trapeze_bot_right_points = []
-trapeze_top_left_points = []
-trapeze_top_right_points = []
-triangle_left_points = []
-triangle_right_points = []
+
+# Cone list
+cone_list = []
+
+if len(b_boxes) != 2:
+    print("Multiple cone detection not supported")
+    exit(-1)
 
 for b_box  in b_boxes:
     x, y, w, h = b_box
@@ -101,6 +130,8 @@ for b_box  in b_boxes:
     y_min = max(0, y - int(h*margin))
     x_max = min(img.shape[1] - 1, x + w + int(w*margin))
     y_max = min(img.shape[0] - 1, y + h + int(h*margin))
+
+    cone = Cone(img, x_min, x_max, y_min, y_max)
 
     # Extract the region of interest (ROI) from the original image
     roi = img[y_min:y_max, x_min:x_max]
@@ -145,40 +176,43 @@ for b_box  in b_boxes:
     # Get top right point of the trapeze
     tra_topright_point = max(max_contour, key=lambda point: 71 * point[0][0] - 100 * point[0][1] )[0]
 
-    # Transform to global coordinates and append the points
-    triangle_top_points.append([x_min + tri_top_point[0], y_min + tri_top_point[1]])
-    triangle_left_points.append([x_min + tri_left_point[0], y_min + tri_left_point[1]])
-    triangle_right_points.append([x_min + tri_right_point[0], y_min + tri_right_point[1]])
+    # Transform to global coordinates and append the cone
+    cone.triangle_top       = [x_min + tri_top_point[0], y_min + tri_top_point[1]]
+    cone.triangle_left      = [x_min + tri_left_point[0], y_min + tri_left_point[1]]
+    cone.triangle_right     = [x_min + tri_right_point[0], y_min + tri_right_point[1]]
 
-    trapeze_bot_left_points.append([x_min + tra_left_point[0], y_min + tra_left_point[1]])
-    trapeze_bot_right_points.append([x_min + tra_right_point[0], y_min + tra_right_point[1]])
-    trapeze_top_left_points.append([x_min + tra_topleft_point[0], y_min + tra_topleft_point[1]])
-    trapeze_top_right_points.append([x_min + tra_topright_point[0], y_min + tra_topright_point[1]])
-
+    cone.trapeze_bot_left   = [x_min + tra_left_point[0], y_min + tra_left_point[1]]
+    cone.trapeze_bot_right  = [x_min + tra_right_point[0], y_min + tra_right_point[1]]
+    cone.trapeze_top_left   = [x_min + tra_topleft_point[0], y_min + tra_topleft_point[1]]
+    cone.trapeze_top_right  = [x_min + tra_topright_point[0], y_min + tra_topright_point[1]]
+    
     # Draw the circles on the image
     cv2.circle(roi, (tri_top_point[0], tri_top_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
-    cv2.circle(roi, (tri_left_point[0], tri_left_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
-    cv2.circle(roi, (tri_right_point[0], tri_right_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
+    cv2.circle(roi, (tri_left_point[0], tri_left_point[1]), 5, (0, 0, 255), -1)  
+    cv2.circle(roi, (tri_right_point[0], tri_right_point[1]), 5, (0, 0, 255), -1)  
 
-    cv2.circle(roi, (tra_right_point[0], tra_right_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
-    cv2.circle(roi, (tra_left_point[0], tra_left_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
-    cv2.circle(roi, (tra_topright_point[0], tra_topright_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
-    cv2.circle(roi, (tra_topleft_point[0], tra_topleft_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
+    cv2.circle(roi, (tra_right_point[0], tra_right_point[1]), 5, (0, 0, 255), -1)  
+    cv2.circle(roi, (tra_left_point[0], tra_left_point[1]), 5, (0, 0, 255), -1)  
+    cv2.circle(roi, (tra_topright_point[0], tra_topright_point[1]), 5, (0, 0, 255), -1)  
+    cv2.circle(roi, (tra_topleft_point[0], tra_topleft_point[1]), 5, (0, 0, 255), -1)  
+
+    cone_list.append(cone)
+    
 
 # Calibrate these parameters
 camera_baseline = 0.119953  # Baseline in m
 camera_focal = 466  # De momento es invent
 
 # Compute disparities
-disparity_tri_top = (triangle_top_points[0][0] - width/4) - (triangle_top_points[1][0] - 3*width/4)
-disparity_tri_right = (triangle_right_points[0][0] - width/4) - (triangle_right_points[1][0] - 3*width/4)
-disparity_tri_left = (triangle_left_points[0][0] - width/4) - (triangle_left_points[1][0] - 3*width/4)
+disparity_tri_top = (cone_list[0].triangle_top[0] - width/4) - (cone_list[1].triangle_top[0] - 3*width/4)
+disparity_tri_right = (cone_list[0].triangle_right[0] - width/4) - (cone_list[1].triangle_right[0] - 3*width/4)
+disparity_tri_left = (cone_list[0].triangle_left[0] - width/4) - (cone_list[1].triangle_left[0] - 3*width/4)
 
 
-disparity_trap_left = (trapeze_bot_left_points[0][0] - width/4) - (trapeze_bot_left_points[1][0] - 3*width/4)
-disparity_trap_right = (trapeze_bot_right_points[0][0] - width/4) - (trapeze_bot_right_points[1][0] - 3*width/4)
-disparity_trap_topleft = (trapeze_top_left_points[0][0] - width/4) - (trapeze_top_left_points[1][0] - 3*width/4)
-disparity_trap_topright = (trapeze_top_right_points[0][0] - width/4) - (trapeze_top_right_points[1][0] - 3*width/4)
+disparity_trap_left = (cone_list[0].trapeze_bot_left[0] - width/4) - (cone_list[1].trapeze_bot_left[0] - 3*width/4)
+disparity_trap_right = (cone_list[0].trapeze_bot_right[0] - width/4) - (cone_list[1].trapeze_bot_right[0] - 3*width/4)
+disparity_trap_topleft = (cone_list[0].trapeze_top_left[0] - width/4) - (cone_list[1].trapeze_top_left[0] - 3*width/4)
+disparity_trap_topright = (cone_list[0].trapeze_top_right[0] - width/4) - (cone_list[1].trapeze_top_right[0] - 3*width/4)
 
 # Compute depths
 depth_tri_top = camera_focal*camera_baseline/disparity_tri_top
@@ -196,14 +230,14 @@ mean_depth = statistics.mean([depth_tri_top, depth_tri_right, depth_tri_left, de
 stddev_depth = statistics.stdev([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
 
 # Draw lines between the points
-cv2.line(img, triangle_top_points[0], triangle_top_points[1], (255, 255, 255), 1)  # Adjust thickness as desired
-cv2.line(img, triangle_left_points[0], triangle_left_points[1], (255, 255, 255), 1) 
-cv2.line(img, triangle_right_points[0], triangle_right_points[1], (255, 255, 255), 1) 
+cv2.line(img, cone_list[0].triangle_top, cone_list[1].triangle_top, (255, 255, 255), 1)  # Adjust thickness as desired
+cv2.line(img, cone_list[0].triangle_left, cone_list[1].triangle_left, (255, 255, 255), 1) 
+cv2.line(img, cone_list[0].triangle_right, cone_list[1].triangle_right, (255, 255, 255), 1) 
 
-cv2.line(img, trapeze_bot_left_points[0], trapeze_bot_left_points[1], (255, 255, 255), 1) 
-cv2.line(img, trapeze_bot_right_points[0], trapeze_bot_right_points[1], (255, 255, 255), 1)  
-cv2.line(img, trapeze_top_left_points[0], trapeze_top_left_points[1], (255, 255, 255), 1)  
-cv2.line(img, trapeze_top_right_points[0], trapeze_top_right_points[1], (255, 255, 255), 1)  
+cv2.line(img, cone_list[0].trapeze_bot_left, cone_list[1].trapeze_bot_left, (255, 255, 255), 1) 
+cv2.line(img, cone_list[0].trapeze_bot_right, cone_list[1].trapeze_bot_right, (255, 255, 255), 1)  
+cv2.line(img, cone_list[0].trapeze_top_left, cone_list[1].trapeze_top_left, (255, 255, 255), 1)  
+cv2.line(img, cone_list[0].trapeze_top_right, cone_list[1].trapeze_top_right, (255, 255, 255), 1)  
 
  
 cv2.putText(img, "Average depth: {:.3}m".format(mean_depth), (width//2 - 500, height - 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
@@ -212,7 +246,7 @@ cv2.putText(img, "Std deviation: {:.3}m".format(stddev_depth), (width//2 - 500, 
 # 3D position based on computed depth
 #   X = Z / fx * (u - cx)
 #   Y = Z / fy * (v - cy)
-projected_center = [statistics.mean([triangle_top_points[0][0], triangle_left_points[0][0], triangle_right_points[0][0], trapeze_bot_left_points[0][0], trapeze_bot_right_points[0][0], trapeze_top_left_points[0][0], trapeze_top_right_points[0][0]]), statistics.mean([triangle_top_points[0][1], triangle_left_points[0][1], triangle_right_points[0][1], trapeze_bot_left_points[0][1], trapeze_bot_right_points[0][1], trapeze_top_left_points[0][1], trapeze_top_right_points[0][1]])]
+projected_center = [statistics.mean([cone_list[0].triangle_top[0], cone_list[0].triangle_left[0], cone_list[0].triangle_right[0], cone_list[0].trapeze_bot_left[0], cone_list[0].trapeze_bot_right[0], cone_list[0].trapeze_top_left[0], cone_list[0].trapeze_top_right[0]]), statistics.mean([cone_list[0].triangle_top[1], cone_list[0].triangle_left[1], cone_list[0].triangle_right[1], cone_list[0].trapeze_bot_left[1], cone_list[0].trapeze_bot_right[1], cone_list[0].trapeze_top_left[1], cone_list[0].trapeze_top_right[1]])]
 
 # Draw circle in the middle of the cone
 cv2.circle(img, (projected_center[0], projected_center[1]), 5, (255, 255, 0), -1)
