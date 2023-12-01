@@ -36,8 +36,8 @@ class Cone:
         self.bounding_box        = BoundingBox(x_min, x_max, y_min, y_max)
 
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument("--image", default='media/test2.png', help="image for prediction")
-parser.add_argument("--video", default='media/nude_cones_hot_videos/Webcam/3m_static.webm', help="class names path")
+parser.add_argument("--image", default='media/test.png', help="image for prediction")
+# parser.add_argument("--video", default='media/nude_cones_hot_videos/Webcam/3m_static.webm', help="class names path")
 parser.add_argument("--config", default='cfg/yolov3-tiny-UPMR.cfg', help="YOLO config path")
 parser.add_argument("--weights", default='weights/yolov3-tiny-UPMR.weights', help="YOLO weights path")
 parser.add_argument("--names", default='data/UPMR.names', help="class names path")
@@ -123,6 +123,7 @@ def distance(b_box1, b_box2):
     middle2 = [(b_box2[0] + b_box2[1])/2, (b_box2[2] + b_box2[3])/2]
     return np.sqrt((middle1[0] - middle2[0])**2 + (middle1[1] - middle2[1])**2)
 
+# Remove cones that have overlapping bounding boxes
 filtered_bboxes = []
 thresh = 10
 if len(b_boxes) != 2:
@@ -152,12 +153,12 @@ for b_box  in b_boxes:
 
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)        # We cast to HSV: Hue, Saturation, Value. It is better since "color" (hue) is continuous, unlike in RGB.
 
-    # lower_blue = np.array([113, 134, 9])                 # We define the color ranges
-    # upper_blue = np.array([129, 255, 44])
-    lower_yellow = np.array([11, 109, 49])
-    upper_yellow = np.array([33, 255, 251])
+    lower_blue = np.array([113, 134, 9])                 # We define the color ranges
+    upper_blue = np.array([129, 255, 44])
+    # lower_yellow = np.array([11, 109, 49])
+    # upper_yellow = np.array([33, 255, 251])
 
-    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)       # We create a mask with the color range we defined
+    mask = cv2.inRange(hsv, lower_blue, upper_blue)       # We create a mask with the color range we defined
     res = cv2.bitwise_and(roi, roi, mask=mask)      # Logical and between mask and frame
 
     # Find contours in the eroded image
@@ -238,6 +239,7 @@ disparity_trap_topleft = (left_cone.trapeze_top_left[0] - width/4) - (right_cone
 disparity_trap_topright = (left_cone.trapeze_top_right[0] - width/4) - (right_cone.trapeze_top_right[0] - 3*width/4)
 
 # Compute depths
+# https://docs.opencv.org/3.4/dd/d53/tutorial_py_depthmap.html
 depth_tri_top = camera_focal*camera_baseline/disparity_tri_top
 depth_tri_right = camera_focal*camera_baseline/disparity_tri_right
 depth_tri_left = camera_focal*camera_baseline/disparity_tri_left
@@ -250,7 +252,7 @@ depth_trap_topright = camera_focal*camera_baseline/disparity_trap_topright
 
 # Statistical parameters
 mean_depth = statistics.mean([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
-# stddev_depth = statistics.stdev([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
+stddev_depth = statistics.stdev([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
 
 # Draw lines between the points
 cv2.line(img, cone_list[0].triangle_top, cone_list[1].triangle_top, (255, 255, 255), 1)  # Adjust thickness as desired
