@@ -63,11 +63,11 @@ output_layers = [layers[i - 1] for i in net.getUnconnectedOutLayers()]
 img = cv2.imread(args.image)
 
 # Open the video file
-video = cv2.VideoCapture(args.video)
+# video = cv2.VideoCapture(args.video)
 
 # Check if the video file was successfully opened
-if not video.isOpened():
-    print("Error opening video file.")
+# if not video.isOpened():
+#     print("Error opening video file.")
 
 height, width = img.shape[:2]
 
@@ -118,9 +118,23 @@ margin = 0.2
 # Cone list
 cone_list = []
 
+def distance(b_box1, b_box2):
+    middle1 = [(b_box1[0] + b_box1[1])/2, (b_box1[2] + b_box1[3])/2]
+    middle2 = [(b_box2[0] + b_box2[1])/2, (b_box2[2] + b_box2[3])/2]
+    return np.sqrt((middle1[0] - middle2[0])**2 + (middle1[1] - middle2[1])**2)
+
+filtered_bboxes = []
+thresh = 10
 if len(b_boxes) != 2:
-    print("Multiple cone detection not supported")
-    exit(-1)
+    # Iterate through the points and filter them based on the threshold
+    for i in range(len(b_boxes)):
+        keep_point = True
+        for j in range(len(filtered_bboxes)):
+           if(distance(b_boxes[i], filtered_bboxes[j]) < thresh):
+               keep_point = False
+        if(keep_point):
+            filtered_bboxes.append(b_boxes[i])
+    b_boxes = filtered_bboxes
 
 for b_box  in b_boxes:
     x, y, w, h = b_box
@@ -138,20 +152,22 @@ for b_box  in b_boxes:
 
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)        # We cast to HSV: Hue, Saturation, Value. It is better since "color" (hue) is continuous, unlike in RGB.
 
-    lower_blue = np.array([113, 134, 9])                 # We define the color ranges
-    upper_blue = np.array([129, 255, 44])
+    # lower_blue = np.array([113, 134, 9])                 # We define the color ranges
+    # upper_blue = np.array([129, 255, 44])
+    lower_yellow = np.array([11, 109, 49])
+    upper_yellow = np.array([33, 255, 251])
 
-    mask = cv2.inRange(hsv, lower_blue, upper_blue)       # We create a mask with the color range we defined
+    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)       # We create a mask with the color range we defined
     res = cv2.bitwise_and(roi, roi, mask=mask)      # Logical and between mask and frame
 
     # Find contours in the eroded image
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
     contours = sorted(contours, key=cv2.contourArea, reverse=True)  # Sort contours by area
-    contours = contours[:2] # Keep the 2 biggest ones
+    # contours = contours[:2] # Keep the 2 biggest ones
 
     # Draw the contour of the cone
-    # cv2.drawContours(roi, contours, -1, (0,255,0))
+    cv2.drawContours(roi, contours, -1, (0,255,0))
 
     
     # Get the bigger one (bottom trapeze)
@@ -186,7 +202,7 @@ for b_box  in b_boxes:
     cone.trapeze_top_left   = [x_min + tra_topleft_point[0], y_min + tra_topleft_point[1]]
     cone.trapeze_top_right  = [x_min + tra_topright_point[0], y_min + tra_topright_point[1]]
     
-    # Draw the circles on the image
+    # # # # # # Draw the circles on the image
     cv2.circle(roi, (tri_top_point[0], tri_top_point[1]), 5, (0, 0, 255), -1)  # -1 fills the circle
     cv2.circle(roi, (tri_left_point[0], tri_left_point[1]), 5, (0, 0, 255), -1)  
     cv2.circle(roi, (tri_right_point[0], tri_right_point[1]), 5, (0, 0, 255), -1)  
@@ -203,16 +219,23 @@ for b_box  in b_boxes:
 camera_baseline = 0.119953  # Baseline in m
 camera_focal = 466  # De momento es invent
 
+left_cone = cone_list[0]
+right_cone = cone_list[1]
+if(left_cone.triangle_top[0] > right_cone.triangle_top[0]):
+    aux_cone = left_cone
+    left_cone = right_cone
+    right_cone = aux_cone
+
 # Compute disparities
-disparity_tri_top = (cone_list[0].triangle_top[0] - width/4) - (cone_list[1].triangle_top[0] - 3*width/4)
-disparity_tri_right = (cone_list[0].triangle_right[0] - width/4) - (cone_list[1].triangle_right[0] - 3*width/4)
-disparity_tri_left = (cone_list[0].triangle_left[0] - width/4) - (cone_list[1].triangle_left[0] - 3*width/4)
+disparity_tri_top = (left_cone.triangle_top[0] - width/4) - (right_cone.triangle_top[0] - 3*width/4)
+disparity_tri_right = (left_cone.triangle_right[0] - width/4) - (right_cone.triangle_right[0] - 3*width/4)
+disparity_tri_left = (left_cone.triangle_left[0] - width/4) - (right_cone.triangle_left[0] - 3*width/4)
 
 
-disparity_trap_left = (cone_list[0].trapeze_bot_left[0] - width/4) - (cone_list[1].trapeze_bot_left[0] - 3*width/4)
-disparity_trap_right = (cone_list[0].trapeze_bot_right[0] - width/4) - (cone_list[1].trapeze_bot_right[0] - 3*width/4)
-disparity_trap_topleft = (cone_list[0].trapeze_top_left[0] - width/4) - (cone_list[1].trapeze_top_left[0] - 3*width/4)
-disparity_trap_topright = (cone_list[0].trapeze_top_right[0] - width/4) - (cone_list[1].trapeze_top_right[0] - 3*width/4)
+disparity_trap_left = (left_cone.trapeze_bot_left[0] - width/4) - (right_cone.trapeze_bot_left[0] - 3*width/4)
+disparity_trap_right = (left_cone.trapeze_bot_right[0] - width/4) - (right_cone.trapeze_bot_right[0] - 3*width/4)
+disparity_trap_topleft = (left_cone.trapeze_top_left[0] - width/4) - (right_cone.trapeze_top_left[0] - 3*width/4)
+disparity_trap_topright = (left_cone.trapeze_top_right[0] - width/4) - (right_cone.trapeze_top_right[0] - 3*width/4)
 
 # Compute depths
 depth_tri_top = camera_focal*camera_baseline/disparity_tri_top
@@ -227,7 +250,7 @@ depth_trap_topright = camera_focal*camera_baseline/disparity_trap_topright
 
 # Statistical parameters
 mean_depth = statistics.mean([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
-stddev_depth = statistics.stdev([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
+# stddev_depth = statistics.stdev([depth_tri_top, depth_tri_right, depth_tri_left, depth_trap_left, depth_trap_right, depth_trap_topleft, depth_trap_topright])
 
 # Draw lines between the points
 cv2.line(img, cone_list[0].triangle_top, cone_list[1].triangle_top, (255, 255, 255), 1)  # Adjust thickness as desired
@@ -241,7 +264,7 @@ cv2.line(img, cone_list[0].trapeze_top_right, cone_list[1].trapeze_top_right, (2
 
  
 cv2.putText(img, "Average depth: {:.3}m".format(mean_depth), (width//2 - 500, height - 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
-cv2.putText(img, "Std deviation: {:.3}m".format(stddev_depth), (width//2 - 500, height - 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
+# cv2.putText(img, "Std deviation: {:.3}m".format(stddev_depth), (width//2 - 500, height - 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
 
 # 3D position based on computed depth
 #   X = Z / fx * (u - cx)
@@ -249,7 +272,10 @@ cv2.putText(img, "Std deviation: {:.3}m".format(stddev_depth), (width//2 - 500, 
 projected_center = [statistics.mean([cone_list[0].triangle_top[0], cone_list[0].triangle_left[0], cone_list[0].triangle_right[0], cone_list[0].trapeze_bot_left[0], cone_list[0].trapeze_bot_right[0], cone_list[0].trapeze_top_left[0], cone_list[0].trapeze_top_right[0]]), statistics.mean([cone_list[0].triangle_top[1], cone_list[0].triangle_left[1], cone_list[0].triangle_right[1], cone_list[0].trapeze_bot_left[1], cone_list[0].trapeze_bot_right[1], cone_list[0].trapeze_top_left[1], cone_list[0].trapeze_top_right[1]])]
 
 # Draw circle in the middle of the cone
-cv2.circle(img, (projected_center[0], projected_center[1]), 5, (255, 255, 0), -1)
+# # # # # cv2.circle(img, (projected_center[0], projected_center[1]), 5, (255, 255, 0), -1)
+for b_box in b_boxes:
+    x,y,w,h = b_box
+    cv2.rectangle(img, (x, y), (x+w, y+h), (0,0,255), 2)
 
 x_pos = mean_depth / camera_focal * (projected_center[0] - width/4)
 y_pos = mean_depth / camera_focal * (projected_center[1] - height/2)

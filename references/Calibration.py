@@ -8,7 +8,8 @@ def nothing(self):
 # cap = cv2.VideoCapture(0)   # For the main camera
 
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument("--image", default='media/test.png', help="image for prediction")
+# parser.add_argument("--image", default='media/test.png', help="image for prediction")
+parser.add_argument("--image", default="C:\\Users\\Juan\\Downloads\\iloveimg-resized (5)\\2m.jpg", help="image for prediction")
 parser.add_argument("--calibration_file", default='cfg/hsvdata.txt', help="file to store results")
 args = parser.parse_args()
 
